@@ -129,7 +129,9 @@ mod tests {
 
     #[test]
     fn plain_line_is_a_message() {
-        assert_eq!(decode("hello"), Ok(Request::Message("hello".into())));
+        assert_eq!(
+            decode("hello").unwrap(),
+            Request::Message("hello".into());
     }
 
     #[test]
