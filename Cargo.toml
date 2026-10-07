@@ -4,6 +4,7 @@ members = [
     "crates/osd-core",
     "crates/osd-protocol",
     "crates/osd-client",
+    "crates/osd-x11",
     "crates/osd-server",
 ]
 
@@ -23,3 +24,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 osd-core = { path = "crates/osd-core" }
 osd-protocol = { path = "crates/osd-protocol" }
+osd-x11 = { path = "crates/osd-x11" }

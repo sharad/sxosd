@@ -231,11 +231,20 @@ dependencies = [
  "clap",
  "osd-core",
  "osd-protocol",
+ "osd-x11",
  "serde",
  "thiserror",
  "toml",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "osd-x11"
+version = "0.1.0"
+dependencies = [
+ "osd-core",
+ "thiserror",
  "x11",
 ]
 

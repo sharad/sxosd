@@ -1,0 +1,11 @@
+[package]
+name = "osd-x11"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+osd-core.workspace = true
+thiserror.workspace = true
+x11 = { version = "2.21", features = ["xlib"] }

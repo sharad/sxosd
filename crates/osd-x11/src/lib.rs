@@ -102,8 +102,6 @@ pub struct X11Renderer {
     fontset: xlib::XFontSet,
     color: xlib::XColor,
     screen: c_int,
-    screen_x: c_int,
-    screen_y: c_int,
     width: u32,
     height: u32,
 }
@@ -123,6 +121,8 @@ impl X11Renderer {
             let colormap = xlib::XDefaultColormap(display, screen);
             // Match XOSD's default xosd_monitor(1): use the first
             // Xinerama monitor when available, otherwise the X11 screen.
+            let mut screen_x = 0;
+            let mut screen_y = 0;
             let mut screen_x = 0;
             let mut screen_y = 0;
             let mut width = xlib::XDisplayWidth(display, screen) as u32;
@@ -303,8 +303,6 @@ impl X11Renderer {
                 fontset,
                 color,
                 screen,
-                screen_x,
-                screen_y,
                 width,
                 height,
             })

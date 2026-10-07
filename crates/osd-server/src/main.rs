@@ -1,5 +1,4 @@
 mod config;
-mod x11_backend;
 
 use clap::Parser;
 use config::RuntimeConfig;
@@ -11,7 +10,7 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 use tracing::{error, info};
-use x11_backend::X11Renderer;
+use osd_x11::X11Renderer;
 
 #[derive(Debug, Parser)]
 #[command(name = "osd-server", about = "Scrolling X11 OSD server")]
