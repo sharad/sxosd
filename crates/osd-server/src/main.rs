@@ -2,7 +2,7 @@ mod config;
 
 use clap::Parser;
 use config::RuntimeConfig;
-use osd_core::{Message, MessageBuffer, Rect, Renderer, ScrollEngine};
+use osd_core::{Direction, Message, MessageBuffer, Rect, Renderer, ScrollEngine};
 use std::io::{BufRead, BufReader};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &config.foreground,
     )?;
 
-    let (tx, rx) = mpsc::channel::<Message>();
+    let (tx, rx) = mpsc::channel::<osd_protocol::Request>();
     let mut queue = MessageBuffer::new(config.queue);
     let mut scroll = ScrollEngine::new(config.scroll);
     let mut last = Instant::now();
@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-fn accept_clients(listener: &UnixListener, tx: Sender<Message>) {
+fn accept_clients(listener: &UnixListener, tx: Sender<osd_protocol::Request>) {
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
@@ -97,7 +97,7 @@ fn accept_clients(listener: &UnixListener, tx: Sender<Message>) {
     }
 }
 
-fn handle_client(stream: UnixStream, tx: Sender<Message>) {
+fn handle_client(stream: UnixStream, tx: Sender<osd_protocol::Request>) {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     loop {
@@ -106,8 +106,18 @@ fn handle_client(stream: UnixStream, tx: Sender<Message>) {
             Ok(0) => break,
             Ok(_) => {
                 let text = line.trim_end_matches(['\r', '\n']);
-                if !text.is_empty() && tx.send(Message::new(text)).is_err() {
-                    break;
+                if text.is_empty() {
+                    continue;
+                }
+                match osd_protocol::decode(text) {
+                    Ok(request) => {
+                        if tx.send(request).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        error!(error = %e, "invalid client request");
+                    }
                 }
             }
             Err(e) => {
@@ -118,13 +128,24 @@ fn handle_client(stream: UnixStream, tx: Sender<Message>) {
     }
 }
 
-fn drain_messages(rx: &Receiver<Message>, queue: &mut MessageBuffer, scroll: &mut ScrollEngine) {
-    let mut received = false;
-    while let Ok(message) = rx.try_recv() {
-        queue.push(message);
-        received = true;
-    }
-    if received {
-        scroll.reset_if_needed();
+fn drain_messages(
+    rx: &Receiver<osd_protocol::Request>,
+    queue: &mut MessageBuffer,
+    scroll: &mut ScrollEngine,
+) {
+    while let Ok(request) = rx.try_recv() {
+        match request {
+            osd_protocol::Request::Message(text) => {
+                queue.push(Message::new(text));
+            }
+            osd_protocol::Request::Command(osd_protocol::Command::SetDirection(direction)) => {
+                let direction = match direction {
+                    osd_protocol::Direction::BottomToTop => Direction::BottomToTop,
+                    osd_protocol::Direction::TopToBottom => Direction::TopToBottom,
+                };
+                scroll.set_direction(direction);
+                info!(?direction, "scroll direction changed");
+            }
+        }
     }
 }

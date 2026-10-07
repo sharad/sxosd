@@ -124,6 +124,17 @@ impl ScrollEngine {
 
     pub fn reset(&mut self) { self.offset = 0.0; }
 
+    /// Change the scrolling direction. The current animation phase is reset
+    /// so the new direction starts from the normal edge of the viewport.
+    pub fn set_direction(&mut self, direction: Direction) {
+        if self.config.direction != direction {
+            self.config.direction = direction;
+            self.offset = 0.0;
+        }
+    }
+
+    pub fn direction(&self) -> Direction { self.config.direction }
+
     /// New messages join the current train without restarting it.
     pub fn reset_if_needed(&mut self) {}
 

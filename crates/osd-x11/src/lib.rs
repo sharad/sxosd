@@ -123,8 +123,6 @@ impl X11Renderer {
             // Xinerama monitor when available, otherwise the X11 screen.
             let mut screen_x = 0;
             let mut screen_y = 0;
-            let mut screen_x = 0;
-            let mut screen_y = 0;
             let mut width = xlib::XDisplayWidth(display, screen) as u32;
             let mut height = xlib::XDisplayHeight(display, screen) as u32;
             let mut xinerama_event = 0;
@@ -318,7 +316,7 @@ impl X11Renderer {
         }
     }
 
-    unsafe fn clear_buffers(&self) {
+    fn clear_buffers(&self) {
         unsafe {
             xlib::XSetForeground(self.display, self.mask_gc_back, xlib::XBlackPixel(self.display, self.screen));
             xlib::XFillRectangle(
