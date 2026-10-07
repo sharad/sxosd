@@ -1,0 +1,21 @@
+[server]
+socket = "/run/user/1000/osd.sock"
+
+[display]
+monitor = "primary"
+position = "right"
+direction = "bottom-to-top"
+
+[scroll]
+speed = 60.0
+line_height = 24.0
+gap = 6.0
+
+[queue]
+capacity = 20
+
+[appearance]
+font = "Sans-18"
+foreground = "white"
+background = "black"
+opacity = 1.0

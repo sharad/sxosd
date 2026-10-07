@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/osd-core",
+    "crates/osd-protocol",
+    "crates/osd-client",
+    "crates/osd-server",
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+version = "0.1.0"
+
+[workspace.dependencies]
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+osd-core = { path = "crates/osd-core" }
+osd-protocol = { path = "crates/osd-protocol" }
