@@ -3,8 +3,6 @@ use std::os::unix::net::UnixStream;
 use std::path::Path;
 use thiserror::Error;
 
-pub use osd_protocol::{Command, Direction, Request};
-
 #[derive(Debug, Error)]
 pub enum ClientError {
     #[error("cannot connect to OSD server: {0}")]
@@ -22,27 +20,24 @@ pub struct Client {
 impl Client {
     pub fn connect(path: impl AsRef<Path>) -> Result<Self, ClientError> {
         let stream = UnixStream::connect(path).map_err(ClientError::Connect)?;
-        Ok(Self {
-            stream: BufWriter::new(stream),
-            max_message_bytes: osd_protocol::DEFAULT_MAX_MESSAGE_BYTES,
-        })
+        Ok(Self { stream: BufWriter::new(stream), max_message_bytes: osd_protocol::DEFAULT_MAX_MESSAGE_BYTES })
     }
 
     pub fn send(&mut self, text: impl AsRef<str>) -> Result<(), ClientError> {
-        self.send_request(Request::Message(text.as_ref().to_owned()))
+        self.send_request(&osd_protocol::Request::Message(text.as_ref().to_owned()))
     }
 
-    pub fn command(&mut self, command: Command) -> Result<(), ClientError> {
-        self.send_request(Request::Command(command))
+    pub fn command(&mut self, command: osd_protocol::Command) -> Result<(), ClientError> {
+        self.send_request(&osd_protocol::Request::Command(command))
     }
 
-    pub fn set_direction(&mut self, direction: Direction) -> Result<(), ClientError> {
-        self.command(Command::SetDirection(direction))
+    pub fn set_direction(&mut self, direction: osd_protocol::Direction) -> Result<(), ClientError> {
+        self.command(osd_protocol::Command::SetDirection(direction))
     }
 
-    fn send_request(&mut self, request: Request) -> Result<(), ClientError> {
+    fn send_request(&mut self, request: &osd_protocol::Request) -> Result<(), ClientError> {
         let stream = self.stream.get_mut();
-        osd_protocol::send(stream, &request, self.max_message_bytes)?;
+        osd_protocol::send_request(stream, request, self.max_message_bytes)?;
         Ok(())
     }
 }

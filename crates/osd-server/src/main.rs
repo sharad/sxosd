@@ -55,13 +55,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut queue = MessageBuffer::new(config.queue);
     let mut scroll = ScrollEngine::new(config.scroll);
     let mut last = Instant::now();
+    let mut paused = false;
 
     loop {
         accept_clients(&listener, tx.clone());
-        drain_messages(&rx, &mut queue, &mut scroll);
+        drain_requests(&rx, &mut queue, &mut scroll, &mut renderer, &mut paused);
 
         let now = Instant::now();
-        scroll.advance(now.duration_since(last));
+        if !paused {
+            scroll.advance(now.duration_since(last));
+        }
         last = now;
 
         renderer.pump_events();
@@ -115,9 +118,7 @@ fn handle_client(stream: UnixStream, tx: Sender<osd_protocol::Request>) {
                             break;
                         }
                     }
-                    Err(e) => {
-                        error!(error = %e, "invalid client request");
-                    }
+                    Err(e) => error!(error = %e, "invalid client request"),
                 }
             }
             Err(e) => {
@@ -128,24 +129,63 @@ fn handle_client(stream: UnixStream, tx: Sender<osd_protocol::Request>) {
     }
 }
 
-fn drain_messages(
+fn drain_requests(
     rx: &Receiver<osd_protocol::Request>,
     queue: &mut MessageBuffer,
     scroll: &mut ScrollEngine,
+    renderer: &mut X11Renderer,
+    paused: &mut bool,
 ) {
     while let Ok(request) = rx.try_recv() {
         match request {
             osd_protocol::Request::Message(text) => {
                 queue.push(Message::new(text));
             }
-            osd_protocol::Request::Command(osd_protocol::Command::SetDirection(direction)) => {
-                let direction = match direction {
-                    osd_protocol::Direction::BottomToTop => Direction::BottomToTop,
-                    osd_protocol::Direction::TopToBottom => Direction::TopToBottom,
-                };
-                scroll.set_direction(direction);
-                info!(?direction, "scroll direction changed");
+            osd_protocol::Request::Command(command) => {
+                if let Err(e) = apply_command(command, queue, scroll, renderer, paused) {
+                    error!(error = %e, "runtime command failed");
+                }
             }
         }
     }
+}
+
+fn apply_command(
+    command: osd_protocol::Command,
+    queue: &mut MessageBuffer,
+    scroll: &mut ScrollEngine,
+    renderer: &mut X11Renderer,
+    paused: &mut bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match command {
+        osd_protocol::Command::SetDirection(direction) => {
+            scroll.set_direction(match direction {
+                osd_protocol::Direction::BottomToTop => Direction::BottomToTop,
+                osd_protocol::Direction::TopToBottom => Direction::TopToBottom,
+            });
+        }
+        osd_protocol::Command::SetSpeed(speed) => {
+            scroll.set_speed_px_per_second(speed)?;
+        }
+        osd_protocol::Command::SetColor(color) => {
+            renderer.set_foreground(&color)?;
+        }
+        osd_protocol::Command::Clear => {
+            queue.clear();
+            scroll.reset();
+        }
+        osd_protocol::Command::Pause => {
+            *paused = true;
+        }
+        osd_protocol::Command::Resume => {
+            *paused = false;
+        }
+        osd_protocol::Command::SetQueueCapacity(capacity) => {
+            if capacity == 0 {
+                return Err("queue capacity must be greater than zero".into());
+            }
+            queue.set_capacity(capacity);
+        }
+    }
+    Ok(())
 }

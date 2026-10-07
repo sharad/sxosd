@@ -75,6 +75,15 @@ impl MessageBuffer {
     pub fn len(&self) -> usize { self.messages.len() }
     pub fn is_empty(&self) -> bool { self.messages.is_empty() }
     pub fn capacity(&self) -> usize { self.policy.capacity }
+
+    pub fn set_capacity(&mut self, capacity: usize) {
+        let capacity = capacity.max(1);
+        self.policy.capacity = capacity;
+        while self.messages.len() > capacity {
+            self.messages.pop_front();
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &Message> { self.messages.iter() }
     pub fn clear(&mut self) { self.messages.clear(); }
 }
@@ -124,8 +133,8 @@ impl ScrollEngine {
 
     pub fn reset(&mut self) { self.offset = 0.0; }
 
-    /// Change the scrolling direction. The current animation phase is reset
-    /// so the new direction starts from the normal edge of the viewport.
+    pub fn direction(&self) -> Direction { self.config.direction }
+
     pub fn set_direction(&mut self, direction: Direction) {
         if self.config.direction != direction {
             self.config.direction = direction;
@@ -133,7 +142,15 @@ impl ScrollEngine {
         }
     }
 
-    pub fn direction(&self) -> Direction { self.config.direction }
+    pub fn speed_px_per_second(&self) -> f64 { self.config.speed_px_per_second }
+
+    pub fn set_speed_px_per_second(&mut self, speed: f64) -> Result<(), &'static str> {
+        if speed <= 0.0 || !speed.is_finite() {
+            return Err("scroll speed must be finite and greater than zero");
+        }
+        self.config.speed_px_per_second = speed;
+        Ok(())
+    }
 
     /// New messages join the current train without restarting it.
     pub fn reset_if_needed(&mut self) {}

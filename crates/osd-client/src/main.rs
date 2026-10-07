@@ -1,60 +1,82 @@
 use clap::{Parser, Subcommand};
-use osd_client::{Client, Direction};
+use osd_client::Client;
+use osd_protocol::{Command, Direction};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
-#[command(name = "osd-client", about = "Send messages and commands to an OSD server")]
+#[command(name = "osd-client", about = "Send messages or commands to an OSD server")]
 struct Args {
     /// Unix socket used by the OSD server.
     #[arg(short, long, default_value = "/run/user/1000/osd.sock", global = true)]
     socket: PathBuf,
 
     #[command(subcommand)]
-    request: Request,
+    command: Option<CommandArgs>,
+
+    /// Message text. Multiple arguments are joined with spaces.
+    #[arg(trailing_var_arg = true)]
+    message: Vec<String>,
 }
 
 #[derive(Debug, Subcommand)]
-enum Request {
-    /// Display a message.
-    Message {
-        /// Message text. Multiple arguments are joined with spaces.
-        #[arg(required = true)]
-        text: Vec<String>,
-    },
-
-    /// Send a server command.
+enum CommandArgs {
+    /// Send a runtime command to the server.
     Cmd {
         #[command(subcommand)]
-        command: Command,
+        command: ServerCommand,
     },
 }
 
 #[derive(Debug, Subcommand)]
-enum Command {
-    /// Change the scrolling direction.
-    Direction {
-        #[arg(value_parser = parse_direction)]
-        direction: Direction,
-    },
+enum ServerCommand {
+    /// Change scroll direction.
+    Direction { value: DirectionValue },
+    /// Change scroll speed in pixels per second.
+    Speed { pixels_per_second: f64 },
+    /// Change foreground color.
+    Color { value: String },
+    /// Clear all queued messages.
+    Clear,
+    /// Pause animation while continuing to accept messages.
+    Pause,
+    /// Resume animation from the current position.
+    Resume,
+    /// Change maximum queue capacity. Shrinking discards oldest messages immediately.
+    QueueCapacity { size: usize },
 }
 
-fn parse_direction(value: &str) -> Result<Direction, String> {
-    match value.to_ascii_lowercase().as_str() {
-        "bottom-to-top" | "up" => Ok(Direction::BottomToTop),
-        "top-to-bottom" | "down" => Ok(Direction::TopToBottom),
-        _ => Err(format!("invalid direction: {value}; use up/down or bottom-to-top/top-to-bottom")),
-    }
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum DirectionValue {
+    BottomToTop,
+    TopToBottom,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let mut client = Client::connect(args.socket)?;
 
-    match args.request {
-        Request::Message { text } => client.send(text.join(" "))?,
-        Request::Cmd { command } => match command {
-            Command::Direction { direction } => client.set_direction(direction)?,
-        },
+    match args.command {
+        Some(CommandArgs::Cmd { command }) => {
+            let command = match command {
+                ServerCommand::Direction { value } => Command::SetDirection(match value {
+                    DirectionValue::BottomToTop => Direction::BottomToTop,
+                    DirectionValue::TopToBottom => Direction::TopToBottom,
+                }),
+                ServerCommand::Speed { pixels_per_second } => Command::SetSpeed(pixels_per_second),
+                ServerCommand::Color { value } => Command::SetColor(value),
+                ServerCommand::Clear => Command::Clear,
+                ServerCommand::Pause => Command::Pause,
+                ServerCommand::Resume => Command::Resume,
+                ServerCommand::QueueCapacity { size } => Command::SetQueueCapacity(size),
+            };
+            client.command(command)?;
+        }
+        None => {
+            if args.message.is_empty() {
+                return Err("a message or command is required".into());
+            }
+            client.send(args.message.join(" "))?;
+        }
     }
 
     Ok(())

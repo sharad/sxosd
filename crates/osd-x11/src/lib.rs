@@ -307,6 +307,27 @@ impl X11Renderer {
         }
     }
 
+    pub fn set_foreground(&mut self, foreground: &str) -> Result<(), X11Error> {
+        unsafe {
+            let colormap = xlib::XDefaultColormap(self.display, self.screen);
+            let color_c = CString::new(foreground)
+                .map_err(|_| X11Error::ColorAlloc(foreground.into()))?;
+            let mut color: xlib::XColor = mem::zeroed();
+            if xlib::XParseColor(self.display, colormap, color_c.as_ptr(), &mut color) == 0
+                || xlib::XAllocColor(self.display, colormap, &mut color) == 0
+            {
+                return Err(X11Error::ColorAlloc(foreground.into()));
+            }
+            let old_pixel = self.color.pixel;
+            self.color = color;
+            xlib::XSetForeground(self.display, self.gc, color.pixel);
+            let mut pixels = old_pixel;
+            xlib::XFreeColors(self.display, colormap, &mut pixels, 1, 0);
+            xlib::XFlush(self.display);
+            Ok(())
+        }
+    }
+
     pub fn pump_events(&self) {
         unsafe {
             while xlib::XPending(self.display) > 0 {
